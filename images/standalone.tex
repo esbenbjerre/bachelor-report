@@ -1,0 +1,62 @@
+\documentclass[crop,tikz,margin=2.5mm]{standalone}
+
+\usepackage[utf8]{inputenc}
+% T1 8-bit font encoding
+\usepackage[T1]{fontenc}
+\usepackage[english]{babel}
+\usepackage{textcomp}
+
+% Mathematical enhancements
+\usepackage{amsmath, amssymb, amsthm}
+
+% Colors
+\usepackage{xcolor}
+\definecolor{color-1}{RGB}{97, 135, 255}
+\definecolor{color-2}{RGB}{54, 185, 118}
+\definecolor{color-3}{RGB}{195, 102, 219}
+
+% Images, graphics, figures and plots
+\usepackage{graphicx}
+\usepackage{tikz}
+\usepackage{pgfplots}
+\pgfplotsset{
+    compat=1.12,
+    every axis plot/.append style={line width=0.8pt}
+}
+
+% Side-by-side figures
+\usepackage{subcaption}
+
+% To modify commands
+\usepackage{xpatch}
+
+% Code fragments
+\usepackage{listings}
+\lstset{
+    basicstyle=\linespread{1.1}\small\ttfamily,
+    commentstyle=\color{gray},
+    morecomment=[l]{///},
+    breaklines=true,
+    breakindent=0pt,
+    upquote=true,
+    columns=fullflexible,
+    keepspaces=true,
+    xleftmargin=0.5\parindent,
+    literate={~} {\raise.5ex\hbox{\texttildelow}}{1}
+}
+
+\lstdefinelanguage{Flix}{
+    keywordstyle = [2]{\color{color-3}},
+    morekeywords = [2]{def, match, enum, case},
+}
+
+% H floating option in figures etc.
+\usepackage{float}
+
+% Use TeX Gyre Termes font
+\usepackage{tgtermes}
+
+\documentclass[crop,tikz]{standalone}
+\begin{document}
+\input{map-scala-treemap-delete-plot}
+\end{document}

@@ -1,0 +1,57 @@
+\input{preamble.tex}
+
+\addbibresource{bibliography.bib}
+
+% Add relative path to image folder
+\graphicspath{{images/}{../images/}}
+
+\begin{document}
+
+% Remove the words "Chapter" and "Appendix" from titles
+\renewcommand{\chaptername}{}
+\renewcommand{\appendixname}{}
+
+% Removed
+%\includepdf[noautoscale=true, width=\paperwidth]{title-page}
+
+\pagestyle{empty}
+\subfile{front-page}
+\newpage
+
+% Removed
+%\pagestyle{empty}
+%\subfile{sections/epigraph}
+%\newpage
+
+\pagenumbering{roman}
+
+\subfile{sections/abstract}
+
+\subfile{sections/acknowledgements}
+
+\tableofcontents{}
+
+% Prevent vertical text stretch
+\raggedbottom
+
+% Reset page style
+\pagestyle{plain}
+
+% Chapters
+\pagenumbering{arabic}
+
+\subfile{sections/introduction}
+
+\subfile{sections/implementation}
+
+\subfile{sections/experimental-evaluation}
+
+\subfile{sections/conclusions}
+
+\subfile{sections/references}
+
+% Removed
+%\appendix
+%\subfile{sections/appendix}
+
+\end{document}

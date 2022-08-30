@@ -1,0 +1,32 @@
+\documentclass[../main.tex]{subfiles}
+
+\begin{document}
+
+\chapter{Conclusions} \label{conclusions}
+
+We have presented an efficient implementation of immutable ordered sets and maps for the Flix programming language. We have implemented 37 distinct functions for sets, including \lstinline{union}, \lstinline{partition} and \lstinline{subsets}. We have implemented 56 distinct functions for maps, including \lstinline{fold}, \lstinline{find} and \lstinline{reduce}. The red-black tree, set and map implementations have been merged into the Flix standard library\footnote{https://flix.dev/api}.
+
+We have evaluated the performance of the implementations, confirming theoretical results and revealing surprising discrepancies. The results shows that the observed performance of the red-black tree is in the order of $O(\log^2{n})$ where $n$ is the size of the tree. The results also shows that the sorting performance of the red-black tree is within a factor $1.5x$ of the sorting algorithm \lstinline{List.sortWith} from the Flix standard library. Finally, the results shows that the performance of searching in the immutable map is comparable to Scala's \lstinline{TreeMap}.
+
+\section{Theory vs. Practice: Surprising Results}
+
+Our hypotheses were constructed from a theoretical and idealized world view. Given that some of the results did not match our hypotheses, some of our assumptions must have been wrong. We reflect on some of the most surprising results below.
+
+\begin{enumerate}[(i)]
+    \item The observed performance of the red-black tree does not equal the theoretical running time of $O(\log{n})$ where $n$ is the size of the tree. We believe this is because the theoretical running time relies on the RAM model, which assumes $O(1)$ memory access \citep{cormen-et-al-2009}.
+    \item The average performance cost of adding a size field to each red-black tree node is up to $17.82x$ for the \lstinline{delete} function. Given that the overhead is only $4$ bytes for each red-black tree node, the observed slowdown seems excessive. We assume that the performance cost may be decreased by future improvements to the Flix compiler.
+    \item The average performance difference between using the red-black tree and \lstinline{Arrays.sort} to sort a sequence of integers is $106.4x$, even though they both have a theoretical running time of $O(n\log{n}})$. We once again observe a clear separation between theory and practice.
+\end{enumerate}
+
+\section{Open Problems}
+
+We conclude by describing some open problems related to this report.
+
+\begin{itemize}
+\item The \lstinline{Map.memberOf} functions seems to be on par with Scala's \lstinline{TreeMap.contains}, so why is \lstinline{Map.insert} and \lstinline{Map.delete} slower than \lstinline{TreeMap.updated} and \lstinline{TreeMap.deleted}?
+\item Given that Flix supports concurrency, is it practical to optimize the implementations using parallelism?
+\item Given that all values in \lstinline{Set} currently contains a 4 byte reference to the unit value \lstinline{()}, would it be practical to use another type, such as \lstinline{Bool} or \lstinline{Int8}?
+\item Given that Flix is considering adding support for \lstinline{null}\footnote{https://github.com/flix/flix/issues/1154}, would it be practical to represent empty trees and/or values in \lstinline{Set} using \lstinline{null} if and when the feature is added?
+\end{itemize}
+
+\end{document}

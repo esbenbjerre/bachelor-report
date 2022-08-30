@@ -1,0 +1,291 @@
+\documentclass[../main.tex]{subfiles}
+
+\begin{document}
+
+\chapter{Experimental Evaluation} \label{experimental-evaluation}
+
+This chapter is about benchmarking and evaluation of the implementations. It starts by diving into the runtime characteristics of the red-black tree. Then it benchmarks and evaluates two possible optimizations. Lastly, it compares the red-black tree to two sorting algorithms and the map to a corresponding implementation from the Scala standard library. All benchmarks, except those in section \ref{comparison-to-scalas-treemap}, will be measured on the red-black tree. The primary type of data visualization will be scatter plots\footnote{https://blog.sigplan.org/2019/11/14/a-plot-twist-part-ii-in-praise-of-scatter-plots}.
+
+\section{Setup}
+We used a machine with macOS 10.15.4 and 8 GB RAM. It has a 2.0 GHz Intel Core i7-4750HQ CPU with 32/256/6000 KB L1/L2/L3 cache and 64-byte cache lines. We used OpenJDK 64-Bit Server VM (14+36-1461) with default JVM options and a fixed heap size of 4 GB. We used Flix version 0.12.0 and Scala version 2.13.2.
+
+Runtime performance tends to be noisy. We acknowledge two major sources of noise on the JVM: the Just-In-Time (JIT) compiler and the garbage collector. The JIT compiler may optimize the code and improve the running time. The garbage collector may temporarily slow down the running time while freeing up the memory.
+
+To mitigate noise, all reported numbers were computed as the median over a large number of iterations. Furthermore, all benchmarks were run one at a time in seperate JVM instances. Given these considerations, we believe that the collected data is sufficiently reliable.
+
+\section{Performance of Search, Insert and Delete} \label{performance-of-seach-insert-and-delete}
+
+The theoretical running time of \lstinline{memberOf}, \lstinline{insert} and \lstinline{delete} is $O(\log{n})$, where $n$ is the size of tree. We expect the performance of our implementation to equal the theoretical running time. In other words, we expect a logarithmic increase in the running time as the tree size increases.
+
+The three functions vary in complexity (i.e., lines of code and number of memory allocations). The implementation of \lstinline{memberOf} is the least complex. In addition to consisting of fewer lines of code, it makes exactly one memory allocation per call. In contrast, \lstinline{insert} and \lstinline{delete} makes several memory allocations due to their need of rebalancing. As a result, we expect \lstinline{memberOf} to perform faster than \lstinline{insert} and \lstinline{delete}. In summary, the hypotheses are:
+
+\begin{hypothesis}
+\lstinline{memberOf}, \lstinline{insert} and \lstinline{delete} runs in $O(\log{n})$ time where $n$ is the size of tree.
+\end{hypothesis}
+\begin{hypothesis}
+\lstinline{memberOf} is faster than \lstinline{insert} and \lstinline{delete} by a constant factor.
+\end{hypothesis}
+
+To test our hypothesis, we measure the execution time of each function on trees of sizes $2^n$ for $n \in [5, 23]$. The keys in the tree are $32$-bit integers from a random number generator. All values in the tree is the unit value \lstinline{()}. For \lstinline{memberOf} and \lstinline{delete} we randomly pick an element from the tree. For \lstinline{insert} we pick a random element not yet present in the tree.
+
+\begin{figure}[H]
+    \pgfplotsset{width=\linewidth}
+    \centering
+    \begin{subfigure}[c]{0.495\textwidth}
+    \input{images/memberOf-insert-delete-median-logn-plot}
+    \caption{$\textsf{runtime}/\log{n}$}
+    \label{memberOf-insert-delete-median-logn-plot}
+    \end{subfigure}
+    \hfill
+    \begin{subfigure}[c]{0.495\textwidth}
+    \input{images/memberOf-insert-delete-median-logn^2-plot}
+    \caption{$\textsf{runtime}/\log^2{n}$}}
+    \label{memberOf-insert-delete-median-logn^2-plot}
+    \end{subfigure}
+    \caption{Plot of the median \textsf{runtime} of \lstinline{memberOf}, \lstinline{insert} and \lstinline{delete}}
+    \label{memberOf-insert-delete-median-plot}
+\end{figure}
+
+Figure \ref{memberOf-insert-delete-median-logn-plot} shows the median runtime of a \lstinline{memberOf}, \lstinline{insert} and \lstinline{delete} function call divided by $\log{n}$ where $n$ is the size of the tree. The $x$-axis shows the size of the tree which ranges from $2^5 = 32$ to $2^{23} = 8,388,608$. The $y$-axis shows the median runtime of a \emph{single} \lstinline{memberOf}, \lstinline{insert} or \lstinline{delete} function call, measured in nanoseconds. The median was computed over 300,000 iterations. We notice two distinct spikes in the running time of \lstinline{delete} which will be discussed in the following section.
+
+For hypothesis 1, we expect a constant function (i.e., a curve with slope zero) for each of the three functions, since we have divided the actual running time by the expected theoretical running time. Figure \ref{memberOf-insert-delete-median-logn-plot} shows that this is not the case. The running time per single function call seems to increase by more than $\log{n}$. For \lstinline{memberOf}, the difference in running time can be observed to be more than a factor $6.3x$. For \lstinline{insert}, the difference in running time can be observed to be more than a factor $2.5x$. For \lstinline{delete}, the difference in running time can be observed to be more than a factor $3.6x$. We conclude that hypothesis 1 must be rejected.
+
+For hypothesis 2, we expect that \lstinline{memberOf} is faster than \lstinline{insert} and \lstinline{delete} by a constant factor. Figure \ref{memberOf-insert-delete-median-logn-plot} shows that \lstinline{memberOf} is faster than \lstinline{insert} and \lstinline{delete} as expected. We conclude that hypothesis 2 is accepted.
+
+To investigate why the performance of \lstinline{memberOf}, \lstinline{insert} and \lstinline{delete} is worse than the expected $\log{n}$, we plot the actual running time of each function divided by an expected running time of $\log^2{n}$ where $n$ is the size of the tree. Figure \ref{memberOf-insert-delete-median-logn^2-plot} shows this plot. We note that the curve has been flattened significantly. The running time of each function seems to be in the order of $O(\log^2{n})$ (i.e., polylogarithmic) where $n$ is the size of the tree. For \lstinline{memberOf}, the difference in running time can be observed to be less than a factor $1.7x$. For \lstinline{insert}, the difference in running time can be observed to be less than a factor $1.5x$. For \lstinline{delete}, the difference in running time can be observed to be less than a factor $1.5x$. We conclude that the observed running time of \lstinline{memberOf}, \lstinline{insert} and \lstinline{delete} is $O(\log^2{n})$.
+
+\subsection{Case Study: Performance Implications of Caching}
+
+In this case study we take a little detour, to investigate the spikes in the running time of \lstinline{delete} shown in figure \ref{memberOf-insert-delete-median-logn-plot}. We observe two distinct spikes. The first spike seems to occur when the tree reaches a size of $2^9$ to $2^{10}$. The second spike seems to occur when the tree reaches a size of $2^{16}$ to $2^{17}$. We hypothesize that the spikes in the running time might be related to caching. We know that the used machine has three cache layers: L1, L2 and L3. The L2 cache is larger but slower than the L1 cache and the L3 cache is larger but slower than the L2 cache. We also know that objects on the JVM are kept in memory. We hypothesize that the spikes occur, when the tree no longer fits in a single layer of cache. 
+
+We will determine how the red-black tree is represented on the JVM and use that to estimate the memory size of the red-black tree at runtime. We are not familiar with the internals of the Flix compiler. However, we know that Flix compiles to bytecode, which we can disassemble and examine using the \lstinline{javap} command\footnote{https://docs.oracle.com/en/java/javase/14/docs/specs/man/javap.html}.
+
+Flix runs as a \lstinline{.jar} file. During runtime, it creates a \lstinline{target} folder which contains compiled bytecode in \lstinline{.class} files. We notice a folder named \lstinline{RedBlackTree} which seems to contain the relevant bytecode
+\begin{lstlisting}
+$ ls RedBlackTree
+Def$blacken$38874.class			IRedBlackTree$Int32$Obj.class
+Def$empty$38768.class			Leaf$Int32$Obj.class
+Def$insert$38669.class			Node$Int32$Obj.class
+...
+\end{lstlisting}
+We disassemble the \lstinline{Node$Int32$Obj.class} file
+\begin{lstlisting}
+$ javap -c -p RedBlackTree/Node\$Int32\$Obj.class
+Compiled from "RedBlackTree/Node$Int32$Obj"
+public final class RedBlackTree.Node$Int32$Obj implements RedBlackTree.IRedBlackTree$Int32$Obj {
+  private java.lang.Object value;
+  public RedBlackTree.Node$Int32$Obj(java.lang.Object);
+    Code:
+       0: aload_0
+...
+\end{lstlisting}
+We observe that the disassembled \lstinline{Node} class has a single field. This is inconsistent with our definition of \lstinline{Node} which has 5 fields: a color, left subtree, key, value and right subtree. We go up a level and notice a file named \lstinline{Tuple5$Obj$Obj$Int32$Obj$Obj.class}. Disassembling this file reveals a structure like the one we expect
+\begin{lstlisting}
+$ javap -c -p Tuple5\$Obj\$Obj\$Int32\$Obj\$Obj.class 
+Compiled from "Tuple5$Obj$Obj$Int32$Obj$Obj"
+public final class Tuple5$Obj$Obj$Int32$Obj$Obj implements ITuple5$Obj$Obj$Int32$Obj$Obj {
+  private java.lang.Object field0;
+  private java.lang.Object field1;
+  private int field2;
+  private java.lang.Object field3;
+  private java.lang.Object field4;
+...
+\end{lstlisting}
+Based on the disassembled bytecode so far, we conclude that Flix compiles a red-black tree node to a class containg a single field of type \lstinline{Tuple5} and that the \lstinline{Tuple5} class contains the 5 fields of a tree node. We continue the analysis and learn that each red-black tree color and leafs are compiled to static classes, which means that only a single instance of each class should exist at runtime.
+
+We will estimate the size of an object as the object header plus the size of its fields. The object header is 16 bytes (12 bytes padded to a multiple of 8). A field of type \lstinline{Object} is a reference of 4 bytes. \citep{lindholm-et-al-2020}. We estimate the size of a \emph{single} tree node as
+\begin{table}[H]
+\begin{tabular}{l|l|l}
+Type & Bytes & Amount \\
+\hline
+Object & 16 & 2 \\
+Reference & 4 & 5 \\
+int & 4 & 1 \\
+\hline
+Total & 56 &
+\end{tabular}
+\end{table}
+The first spike occurs when the tree reaches a size of $2^9$ to $2^{10}$. Using the estimated size of 56 bytes for a node, this gives us $28,672$ to $57,344$ bytes. The second spike occurs when the tree reaches a size of $2^{16}$ to $2^{17}$, using the estimated size of 56 bytes for a node, this gives us $3,670,016$ to $7.340.032$ bytes. The size of the L1 cache is $32,000$ bytes which appears to fit with the first spike. In other words, we observe a slowdown in the performance when the L1 cache is filled. The size of the L3 cache is $6,000,000$ bytes which appears to fit with the second spike. In other words, we observe a slowdown in the performance when the L3 cache is filled. Despite the fact that the numbers are estimates, the results appears to be conclusive. We are unable to observe a slowdown in the performance when the L2 cache is filled. Using the same logic as above, we would expect a slowdown in the performance when the memory usage reaches $256,000$ bytes, which approximately corresponds to a tree of size $2^{12}$. We hypothesize that there might be a smaller difference between the speed of the L2 and L3 cache on the used machine. We conclude that caching has a noticeable impact on the performance of the tree.
+
+\section{Performance Implications of Adding a Size Field}
+
+Recall \lstinline{Set.union} defined as
+\begin{lstlisting}[language=Flix]
+def union(xs: Set[a], ys: Set[a]): Set[a] =
+  foldLeft((acc, x) -> insert(x, acc), xs, ys)
+\end{lstlisting}
+While this definition is short short and concise, it is slow when \lstinline{ys} contains more elements than \lstinline{xs}. We could optimize it by considering the size of each set, switching the order of the arguments accordingly
+\begin{lstlisting}[language=Flix]
+def union(xs: Set[a], ys: Set[a]): Set[a] =
+  if size(xs) > size(ys)
+    foldLeft((acc, x) -> insert(x, acc), xs, ys)
+  else
+    union(ys, xs)
+\end{lstlisting}
+However, this definition adds two calls to \lstinline{Set.size}, each taking $O(n)$ time, which cancels out any performance gains. We can make \lstinline{Set.size} run in $O(1)$ time by adding it as a field to \lstinline{Node}. Augmenting each node with a size field of type \lstinline{Int32} adds an overhead of 4 bytes. We expect that the associated performance cost is neglible (i.e., at most a constant factor). specifically, we expect that the performance cost on \lstinline{memberOf}, \lstinline{insert} and \lstinline{delete} is less than a factor $1.05x$. In summary, the hypotheses are:
+
+\begin{hypothesis}
+The performance cost of adding a size field to every node is at most a constant factor.
+\end{hypothesis}
+
+\begin{hypothesis}
+The performance cost is less than a factor $1.05x$.
+\end{hypothesis}
+
+To test our hypothesis, we augment \lstinline{Node} with a size field of type \lstinline{Int32}
+\begin{lstlisting}[language=Flix]
+enum RedBlackTree[k, v] {
+  case Leaf
+  case Node(Color, Int32, RedBlackTree[k, v], k, v, RedBlackTree[k, v])
+}
+\end{lstlisting}
+We measure the execution time of \lstinline{memberOf}, \lstinline{insert} and \lstinline{delete} as we did in section \ref{performance-of-seach-insert-and-delete}.
+
+\begin{figure}[H]
+    \pgfplotsset{width=\linewidth}
+    \centering
+    \begin{subfigure}[c]{0.495\textwidth}
+    \input{images/constant-time-size-memberOf-performance-plot}
+    \caption{\lstinline{memberOf}}
+    \label{memberOf-performance-with-size}
+    \end{subfigure}
+    \hfill
+    \begin{subfigure}[c]{0.495\textwidth}
+    \input{images/constant-time-size-insert-performance-plot}
+    \caption{\lstinline{insert}}
+    \label{insert-performance-with-size}
+    \end{subfigure}
+    \begin{subfigure}[c]{0.495\textwidth}
+    \input{images/constant-time-size-delete-performance-plot}
+    \caption{\lstinline{delete}}
+    \label{delete-performance-with-size}
+    \end{subfigure}
+    \caption{Plot of the median \textsf{runtime} of \lstinline{memberOf}, \lstinline{insert} and \lstinline{delete} before and after adding a size field}
+\end{figure}
+
+Figure \ref{memberOf-performance-with-size}, \ref{insert-performance-with-size} and \ref{delete-performance-with-size} shows the median runtime of a \lstinline{memberOf}, \lstinline{insert} and \lstinline{delete} function call, respectively, before and after adding a size field to each node. Each point $(x, y)$ consists of two measurements. The $x$-value is the median runtime of the given function before adding the field. The $y$-value is the median runtime of the given function after adding the field. The dotted $x = y$ line represents the optimal case where the performance cost is $0$.
+
+For hypothesis 3, we expect that the performance cost is at most a constant factor. Figure \ref{memberOf-performance-with-size} shows that the average performance cost for \lstinline{memberOf} is a factor $1.05x$. Figure \ref{insert-performance-with-size} shows that the average performance cost for \lstinline{insert} is a factor $2.27x$. Figure \ref{delete-performance-with-size} shows that the average performance cost for \lstinline{delete} is a factor $17.82x$. The performance cost for \lstinline{memberOf} seems relatively constant. In contrast, the performance cost of \lstinline{insert} and \lstinline{appears} appears to decrease with the input size. We note that the performance cost for \lstinline{delete} is much larger than expected. We conclude that hypothesis 3 is accepted.
+
+For hypothesis 4, we expect that the performance cost is at most a factor $1.05x$. Figure \ref{memberOf-performance-with-size} shows that the average performance cost for \lstinline{memberOf} is a factor $1.03x$. Figure \ref{insert-performance-with-size} shows that the average performance cost for \lstinline{insert} is a factor $2.27x$. Figure \ref{delete-performance-with-size} shows that the average performance cost for \lstinline{delete} is a factor $17.82x$. We conclude that hypothesis 4 is accepted for \lstinline{memberOf} but must be rejected for \lstinline{insert} and \lstinline{delete}.
+
+\section{Performance Implications of Representing Color with a Byte}
+
+The current definition of the color of a red-black tree node as an algebraic data type is semantically clear. However, clarity comes with a cost. Each of the colors becomes an object on the JVM, which means each node has a 4 byte reference to a color. We could represent the color of a node using a byte instead, replacing the \lstinline{Color} type with \lstinline{Int8}. We anticipate that we can improve the performance of the red-black tree by sacrificing a little readability for a reduced memory footprint. Specifically, we expect to see an increase in the performance of \lstinline{memberOf}, \lstinline{insert} and \lstinline{delete}. The three methods vary in complexity (i.e., lines of code and number of memory allocations). The implementation of \lstinline{delete} is the most complex. As a result, we expect that \lstinline{delete} will show the largest increase in performance. In summary, the hypotheses are:
+
+\begin{hypothesis}
+The performance of \lstinline{memberOf}, \lstinline{insert} and \lstinline{delete} is increased.
+\end{hypothesis}
+
+\begin{hypothesis}
+The performance increase of \lstinline{delete} is greater than the one for \lstinline{memberOf} and \lstinline{insert}.
+\end{hypothesis}
+
+To test our hypothesis, we replace the \lstinline{Color} type in \lstinline{Node} by \lstinline{Int8}
+\begin{lstlisting}[language=Flix]
+enum RedBlackTree[k, v] {
+  case Leaf
+  case Node(Int8, Int32, RedBlackTree[k, v], k, v, RedBlackTree[k, v])
+}
+\end{lstlisting}
+We map each of the existing colors to a distinct integer
+\begin{align*}
+\lstinline{Red} \rightarrow 0\\
+\lstinline{Black} \rightarrow 1\\
+\lstinline{DoubleBlack} \rightarrow 2
+\end{align*}
+We measure the execution time of \lstinline{memberOf}, \lstinline{insert} and \lstinline{delete} as we did in section \ref{performance-of-seach-insert-and-delete}.
+
+\begin{figure}[H]
+  \pgfplotsset{width=\linewidth}
+  \centering
+  \begin{subfigure}[c]{0.495\textwidth}
+  \input{images/int8-color-memberOf-performance-plot}
+  \caption{\lstinline{memberOf}}
+  \label{memberOf-performance-with-int8}
+  \end{subfigure}
+  \hfill
+  \begin{subfigure}[c]{0.495\textwidth}
+  \input{images/int8-color-insert-performance-plot}
+  \caption{\lstinline{insert}}
+  \label{insert-performance-with-int8}
+  \end{subfigure}
+  \begin{subfigure}[c]{0.495\textwidth}
+  \input{images/int8-color-delete-performance-plot}
+  \caption{\lstinline{delete}}
+  \label{delete-performance-with-int8}
+  \end{subfigure}
+  \caption{Plot of the median \textsf{runtime} of \lstinline{memberOf}, \lstinline{insert} and \lstinline{delete} before and after replacing the \lstinline{Color} type by \lstinline{Int8}}
+  \label{performance-with-int8}
+\end{figure}
+
+Figure \ref{memberOf-performance-with-int8}, \ref{insert-performance-with-int8} and \ref{delete-performance-with-int8} shows the median runtime of a \lstinline{memberOf}, \lstinline{insert} and \lstinline{delete} function call, respectively, before and after replacing the \lstinline{Color} type by \lstinline{Int8}. Each point $(x, y)$ consists of two measurements. The $x$-value is the median runtime of the given function before replacing the color type. The $y$-value is the median runtime of the given function after replacing the color type. The dotted $x = y$ line represents the case where the performance difference is $0$.
+
+For hypothesis 5 we expect an increase in the performance of \lstinline{memberOf}, \lstinline{insert} and \lstinline{delete}. Figure \ref{memberOf-performance-with-int8} shows an average performance increase of a factor $1.15x$ for \lstinline{memberOf}. Figure \ref{insert-performance-with-int8} shows an average performance increase of a factor $1.21x$ for \lstinline{insert}. Figure \ref{delete-performance-with-int8} shows an average performance increase of a factor $1.66x$ for \lstinline{delete}. We note that the data is clear, except for a single outlier in figure \ref{memberOf-performance-with-int8}. We conclude that hypothesis 5 is accepted.
+
+For hypothesis 6 we expect that the performance increase of \lstinline{delete} is greather than the one for \lstinline{memberOf} and \lstinline{insert}. Figure \ref{performance-with-int8} confirms this. The average performance increase of \lstinline{delete} is a factor $1.37x$ greater than the one for \lstinline{memberOf} and a factor $1.44x$ greater than the one for \lstinline{insert}. We conclude that hypothesis 6 is accepted.
+
+\section{Comparison to Sorting Algorithms}
+
+Since a red-black tree is a binary search tree, with $O(\log{n})$ insertion, we can use it to sort a sequence of $n$ comparable elements in $O(n\log{n})$ time. The sorting algorithm consists of inserting each element of the sequence into the red-black tree. While red-black trees are typically not used for sorting in practice (in part due to larger memory overhead), we think a comparison against efficient sorting algorithms can serve as a performance sanity check for our implementation. We compare the performance of sorting a sequence of numbers using the red-black tree with two sorting algorithms, namely \lstinline{List.sortWith} from the Flix standard library and \lstinline{Arrays.sort} from the \lstinline{java.util} package. \lstinline{List.sortWith} uses a mergesort, ported from \lstinline{sortBy} found in the libraries of Haskell\footnote{https://downloads.haskell.org/~ghc/latest/docs/html/libraries/containers-0.6.2.1/Data-Sequence.html#v:sortBy}. \lstinline{Arrays.sort} uses a dual-pivot quicksort\footnote{https://docs.oracle.com/en/java/javase/14/docs/api/java.base/java/util/Arrays.html#sort(int[])} for primitive arrays such as \lstinline{int[]}. Given that \lstinline{Arrays.sort} has undergone extensive emperical testing and operates in-place on mutable arrays, we expect it to perform faster than both the red-black tree and \lstinline{List.sortWith}. Since \lstinline{List.sortWith} is an algorithm specifically designed for sorting immutable data, we expect it to perform faster than the red-black tree. In summary, the hypotheses are:
+\begin{hypothesis}
+\lstinline{Arrays.sort} performs faster than \lstinline{List.sortWith} and the red-black tree.
+\end{hypothesis}
+
+\begin{hypothesis}
+\lstinline{List.sortWith} performs faster than the red-black tree.
+\end{hypothesis}
+
+To test our hypothesis, we measure the time required by the red-black tree, \lstinline{List.sortWith} and \lstinline{Arrays.sort} to sort a sequence of $2^n$ random 32-bit integers for $n \in [5, 23]$. For the red-black tree, we measure the time it takes to insert $2^n$ elements of type \lstinline{Int32}. For \lstinline{List.sortWith}, we measure the time it takes to sort a \lstinline{List[Int32]} of length $2^n$. For \lstinline{Arrays.sort}, we measure the time it takes to sort an \lstinline{int[]} array of length $2^n$.
+
+\begin{figure}[H]
+  \centering
+  \input{images/sorting-plot}
+  \caption{Plot of the median \textsf{time} required by \lstinline{RedBlackTree}, \lstinline{List.sortWith} and \lstinline{Arrays.sort} to sort random 32-bit integers}
+  \label{sorting-plot}
+\end{figure}
+
+Figure \ref{sorting-plot} shows the median time required by the red-black tree, \lstinline{List.sortWith} and \lstinline{Arrays.sort} to sort a sequence of random 32-bit integers. The $x$-axis shows the number of elements which ranges from $2^5 = 32$ to $2^{23} = 8,388,608$. The $y$-axis shows the median time required to sort the elements, measured in nanoseconds. Note that the $y$-axis is logarithmic. The median was computed over a number of iterations inverse proportional to the input size. To minimize noise in the measurements, we used a large number of iterations for sequences of smaller length. Due to runtime considerations, we used a smaller number of iterations for sequences of larger length. We note that the data is clean for all input sizes we consider in the range $[2^5, 2^{23}]$ and that all three algorithms appears to scale well with the input size.
+
+For hypothesis 5, we expect that \lstinline{Arrays.sort} performs faster than the red-black tree and \lstinline{List.sortWith}. Figure \ref{sorting-plot} shows that \lstinline{Arrays.sort} is faster as expected. \lstinline{Arrays.sort} can be observed to be a factor $106.4x$ faster than the red-black tree. While a factor $106.4x$ sounds huge, it must be taken into account that \lstinline{Arrays.sort} uses a sorting algorithm optimized for the JVM and operates on mutable arrays with excellent memory locality. In comparison, the red-black tree is immutable and has a much larger memory overhead. In addition to this, some of the slowdown can be traced to the Flix compiler. Flix currently has a factor $1$-$5x$ overhead for tail calls and a factor $1$-$2x$ overhead on uncurrying, which means up to $10x$ of the slowdown may be related to the Flix compiler. \lstinline{Arrays.sort} can be observed to be a factor $71.8x$ faster than \lstinline{List.sortWith} on average. We conclude that hypothesis 5 is accepted.
+
+For hypothesis 6, we expect that \lstinline{List.sortWith} performs faster than the red-black tree. Figure \ref{sorting-plot} shows that \lstinline{List.sortWith} is faster as expected. \lstinline{List.sortWith} can be observed to be a factor $1.5x$ faster than the red-black tree on average. Given that \lstinline{List.sortWith} is specifically designed for sorting, the performance difference is surprisingly small. The fact that the red-black tree is only a factor $1.5x$ slower than \lstinline{List.sortWith} on average, despite having a larger memory overhead, indicates that the insertion algorithm in the red-black tree is fairly efficient. We find that the sorting performance of the red-black tree is on par with \lstinline{List.sortWith}. We conclude that hypothesis 6 is accepted.
+
+\section{Comparison to Scala's TreeMap} \label{comparison-to-scalas-treemap}
+
+The Scala standard library includes \lstinline{TreeMap}, an immutable sorted map implementation, whose elements are stored in a red-black tree\footnote{https://www.scala-lang.org/api/current/scala/collection/immutable/TreeMap.html}. Both Flix and Scala compiles to JVM bytecode and runs on the Java Virtual Machine. Given that the language platform and the underlying data structure of our \lstinline{Map} and Scala's \lstinline{TreeMap} is identical, we expect that the performance of \lstinline{Map} and \lstinline{TreeMap} is comparable. Specifically, we expect that the performance of search, insert and delete is comparable. In summary, the hypothesis is:
+\begin{hypothesis}
+The performance of search, insert and delete on \lstinline{Map} and \lstinline{TreeMap} is comparable.
+\end{hypothesis}
+
+To test our hypothesis, we measure the execution time of search, insert and delete for both map implementations. We consider maps of sizes $2^n$ for $n \in [5, 23]$ and measure the execution time of each functions as follows. We preconstruct a map containing $2^n$ key-value pairs. The keys in the map are 32-bit integers from a random number generator. All values in the map is the unit value \lstinline{()}. For search and delete we randomly pick an element from the map. For insert we pick a random element not yet present in the map. The search, insert and delete functions on \lstinline{Map} are \lstinline{memberOf}, \lstinline{insert} and \lstinline{delete}, respectively. The search, insert and delete functions on \lstinline{TreeMap} are \lstinline{contains}, \lstinline{updated} and \lstinline{removed}, respectively.
+
+\begin{figure}[H]
+  \pgfplotsset{width=\linewidth}
+  \centering
+  \begin{subfigure}[c]{0.495\textwidth}
+  \input{images/map-scala-treemap-search-plot}
+  \caption{\lstinline{memberOf} / \lstinline{contains}}
+  \label{map-scala-treemap-search-plot}
+  \end{subfigure}
+  \hfill
+  \begin{subfigure}[c]{0.495\textwidth}
+  \input{images/map-scala-treemap-insert-plot}
+  \caption{\lstinline{insert} / \lstinline{updated}}
+  \label{map-scala-treemap-insert-plot}
+  \end{subfigure}
+  \begin{subfigure}[c]{0.495\textwidth}
+  \input{images/map-scala-treemap-delete-plot}
+  \caption{\lstinline{delete} / \lstinline{removed}}
+  \label{map-scala-treemap-delete-plot}
+  \end{subfigure}
+  \caption{Plot of the median \textsf{runtime} of search, insert and delete on \lstinline{Map} and \lstinline{TreeMap}}
+\end{figure}
+
+Figure \ref{map-scala-treemap-search-plot}, \ref{map-scala-treemap-insert-plot} and \ref{map-scala-treemap-delete-plot} shows the median \textsf{runtime} of search, insert and delete, respectively. Each point $(x, y)$ consists of two measurements. The $x$-value is the median runtime of the given functions on Scala's \lstinline{TreeMap}. The $y$-value is the median runtime of the given functions on our \lstinline{Map}. The dotted $x = y$ line represents a performance difference of $0$.
+
+For hypothesis 9 we expect that the performance of \lstinline{Map} and \lstinline{TreeMap} is comparable. In other words, we expect that all points are positioned along the $x = y$ line, or close to it. Figure \ref{map-scala-treemap-search-plot} shows that \lstinline{Map.memberOf} is a factor $2.24x$ slower than \lstinline{TreeMap.contains} on average. Figure \ref{map-scala-treemap-search-plot} also shows that the performance difference seems to decrease with the map size. Figure \ref{map-scala-treemap-insert-plot} shows that \lstinline{Map.insert} is a factor $7.21x$ slower than \lstinline{TreeMap.updated} on average. Figure \ref{map-scala-treemap-insert-plot} also shows that the performance difference seems to increase with the map size. Figure \ref{map-scala-treemap-delete-plot} shows that \lstinline{Map.delete} is a factor $4.85x$ slower than \lstinline{TreeMap.removed} on average. Figure \ref{map-scala-treemap-search-plot} also shows that the performance difference seems to decrease with the map size. \citet{dahse-2020} has shown that the performance of \lstinline{Map} can be speed up by a factor $1.32x$-$1.96x$. Considering this, we determine that the performance of search on \lstinline{Map} and \lstinline{TreeMap} is comparable. We note that the performance difference on insert and delete is larger than expected. We conclude that hypothesis 9 is accepted for search and must be rejected for insert and delete.
+
+To investigate why the performance difference is larger than expected, we conducted a short review of the red-black tree implementation used by \lstinline{TreeMap}\footnote{https://github.com/scala/scala/blob/v2.13.2/src/library/scala/collection/immutable/RedBlackTree.scala}. The review revealed that Scala's red-black tree is optimized by representing empty trees with \lstinline{null}. As of yet, this is not possible in Flix. Scala's red-black tree also appears to be using mutable state in some parts of the implementation.
+
+\end{document}

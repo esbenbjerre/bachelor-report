@@ -1,0 +1,36 @@
+\documentclass[../main.tex]{subfiles}
+
+\begin{document}
+
+\chapter{Introduction}
+
+Introductory programming courses usually focus on the imperative programming paradigm. While imperative programming is undeniable closer to how the hardware works (CPU registers are mutable, after all), mutability can make it hard to reason about the behaviour of programs. In imperative programming, changes in the internal state of a program may modify the behaviour of functions, such that \lstinline{f(x) = y} now, but it may not be later. This is not true for functional programming. Pure functions applied to the same values yield the same result each time they are invoked. This property, known as referential transparency, makes it possible to conduct equational reasoning on the code. For instance, if \lstinline{f(x) = y} and \lstinline{g(y, y) = h} then we can be sure that \lstinline{g(f(x), f(x)) = h}. In functional programming, values are immutable. Instead of modifying existing values, modified copies are created. The same philosophy and benefits applies to immutable data structures.
+
+In this report, we present an implementation of immutable ordered sets and maps in the Flix programming language\footnote{https://flix.dev}. Sets and maps are foundational data structures which are often used as part of modelling other data types and algorithms. The Flix standard library missed efficient sets and maps, which have been added as a result of this report. The set and map implementations are rich data structures, supporting a combined total of 93 distinct functions.
+
+The sets and maps are implemented using immutable red-black trees \citep{okasaki-1998, germane-matthew-2014}. Red-black trees are a well-known type of balanced binary search tree, which support search, insert and delete in $O(\log{n})$ time where $n$ is the size of the tree \citep{cormen-et-al-2009}.
+
+The implementations have been benchmarked, showing that the performance of the red-black tree in practice, is in the order of $O(\log^2{n})$ where $n$ is the size of tree. The benchmarks also shows that the sorting performance of the red-black tree is within a factor $1.5x$ of a sorting algorithm for immutable lists found in the Flix standard library. Lastly, the benchmarks shows that the search performance of the immutable map is comparable to Scala's \lstinline{TreeMap}.
+
+The main contributions of this report are the immutable red-black tree, set and map implementations spanning more than 1300 lines of code\footnote{https://github.com/flix/flix/tree/master/main/src/library}.
+
+\section{Trees vs. Hashing: A Question of Order}
+
+In a functional context, sets and maps are typically implemented using either balanced binary search trees or hash tries. A balanced binary search tree supports search, insert and delete in $O(\log{n})$ time, where $n$ is the size of the tree \citep{cormen-et-al-2009}. The $O(\log{n})$ time complexity guarantees that the time used to search for, insert or delete an element in the tree is bounded above by the logarithm of the size of the tree.
+
+A hash trie supports search, insert and delete in $O(1)$ amortized time \citep{bagwell-2001}. However, hashing destroys the ordering of the keys. In contrast, binary search trees maintains their elements in sorted order. Given the lack of order in hash tries and the simplicity of binary trees, we opt for the latter.
+
+\section{Source Language}
+
+All source code will be presented in Flix. However, the implementation can easily be translated into any other functional language. Flix is a functional-first programming language with support for algebraic data types, pattern matching, parametric polymorphism, higher-order functions and tail call elimination \citep{magnus-et-al-2016, magnus-et-al-2018}. Flix compiles to JVM bytecode and runs on the Java Virtual Machine. A distinct feature of Flix is that the type and effect system supports effect polymorphism\footnote{https://flix.dev/#/blog/taming-impurity-with-polymorphic-effects}. In short, the type and effect system allows us to seperate pure and impure code, restrict the purity of function arguments and specify that the effect of a higher-order function depends on the effects of its function arguments.
+
+\section{Goal}
+
+The goal of this report is twofold:
+
+\begin{enumerate}[(i)]
+\item Implement efficient immutable ordered sets and maps in Flix.
+\item Benchmark and evaluate the performance of the implementations.
+\end{enumerate}
+
+\end{document}

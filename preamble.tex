@@ -1,0 +1,96 @@
+\documentclass[a4paper, twoside, 11pt, openright english]{report}
+\usepackage[utf8]{inputenc}
+% T1 8-bit font encoding
+\usepackage[T1]{fontenc}
+\usepackage[english]{babel}
+\usepackage{textcomp}
+
+% Mathematical enhancements
+\usepackage{amsmath, amssymb, amsthm}
+
+% Colors
+\usepackage{xcolor}
+\definecolor{color-1}{RGB}{97, 135, 255}
+\definecolor{color-2}{RGB}{54, 185, 118}
+\definecolor{color-3}{RGB}{195, 102, 219}
+
+% Images, graphics, figures and plots
+\usepackage{graphicx}
+\usepackage{tikz}
+\usepackage{forest}
+\usetikzlibrary{trees}
+\usepackage{pgfplots}
+\pgfplotsset{
+    compat=1.12,
+    every axis plot/.append style={line width=0.8pt}
+}
+
+\usepackage{epigraph}
+
+% Side-by-side figures
+\usepackage{subcaption}
+
+% Inserting PDF pages
+\usepackage{pdfpages}
+
+% To modify commands
+\usepackage{xpatch}
+
+% BibLaTeX
+\usepackage{csquotes}
+\usepackage[
+    style=authoryear,
+    dashed=false,
+    sorting=nyt,
+    uniquename=init, giveninits,
+    backend=biber, natbib,
+    urldate=comp,
+    maxbibnames=99
+]{biblatex}
+\DeclareNameAlias{author}{family-given}
+
+% Add hypothesis enunciation
+\theoremstyle{definition}
+\newtheorem{hypothesis}{Hypothesis}
+
+% Remove dot after hypothesis title
+\makeatletter
+\xpatchcmd{\@thm}{\thm@headpunct{.}}{\thm@headpunct{}}{}{}
+\makeatother
+
+% Adjust margin on select pages
+\usepackage{geometry}
+
+% Code fragments
+\usepackage{listings}
+\lstset{
+    basicstyle=\linespread{1.1}\small\ttfamily,
+    commentstyle=\color{gray},
+    morecomment=[l]{///},
+    breaklines=true,
+    breakindent=0pt,
+    upquote=true,
+    columns=fullflexible,
+    keepspaces=true,
+    xleftmargin=0.5\parindent,
+    literate={~} {\raise.5ex\hbox{\texttildelow}}{1}
+}
+
+\lstdefinelanguage{Flix}{
+    keywordstyle = [2]{\color{color-3}},
+    morekeywords = [2]{def, match, enum, case},
+}
+
+% H floating option in figures etc.
+\usepackage{float}
+
+\usepackage{abstract}
+
+% Allows lists enumerated as (i), (ii), ...
+\usepackage{enumerate}
+
+% Use TeX Gyre Termes font
+\usepackage{tgtermes}
+
+% Multi-file management
+\usepackage{subfiles}

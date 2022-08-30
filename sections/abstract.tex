@@ -1,0 +1,16 @@
+\documentclass[../main.tex]{subfiles}
+
+\begin{document}
+
+% Use same font size as \subsection
+\renewcommand{\abstractnamefont}{\normalfont\large\bfseries}
+
+\begin{abstract}
+\thispagestyle{plain}
+\addcontentsline{toc}{chapter}{Abstract}
+
+An advantage of functional programming is that it allows for easy modularization: we can compose simpler types and functions to build more complex ones. Applying pure functions to immutable values provides referential transparency, which makes programs easier to write, use and reason about. In a functonal setting, data structures are values and inherits the benefits of referential transparency. In this report, we focus on the implementation of efficient immutable ordered sets and maps. Sets and maps are foundational data structures with intrinsic value. We show how immutable sets and maps can be defined using a red-black tree. We implement the red-black tree, set and map data structures as well as a collection of composable higher-order functions in the Flix programming language and evaluate the performance.
+
+\end{abstract}
+
+\end{document}

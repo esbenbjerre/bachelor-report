@@ -1,0 +1,393 @@
+\documentclass[../main.tex]{subfiles}
+
+\begin{document}
+
+\chapter{Implementation} \label{implementation}
+
+This chapter is about the implementation of the immutable red-black tree, set and map. It starts with the implementation of the underlying data structure, namely the red-black tree (\ref{red-black-tree}). Then it moves on to the definition of a select subset of generic higher-order functions for the red-black tree. Lastly, it shows how the set (\ref{set}) and map (\ref{map}) are implemented using the red-black tree.
+
+\section{Red-Black Tree} \label{red-black-tree}
+
+A red-black tree is a binary tree which satisfies the following invariants:
+\begin{enumerate}[(i)]
+  \item For all nodes with key $x$, $x$ is greather than all keys in its left subtree and smaller than all keys in its right subtree.
+  \item All nodes are red or black.
+  \item All leaves are black.
+  \item All red nodes has black children.
+  \item Every path from the root to a leaf contains the same number of black nodes.
+\end{enumerate}
+Together, these invariants ensures that the longest path in the tree is no more than twice as long as the shortest \citep{cormen-et-al-2009}.
+
+We will define red-black trees as an algebraic data type. In Flix, the \lstinline{enum} keyword introduces the definition of a data type. We define the color of red-black tree node as
+\begin{lstlisting}[language=Flix]
+enum Color {
+  case Red
+  case Black
+  case DoubleBlack
+}
+\end{lstlisting}
+The third color is a special "double-black" color introduced by \citet{germane-matthew-2014} which simplifies the deletion algorithm. We subsequently define a red-black tree as
+\begin{lstlisting}[language=Flix]
+enum RedBlackTree[k, v] {
+  case Leaf
+  case DoubleBlackLeaf
+  case Node(Color, RedBlackTree[k, v], k, v, RedBlackTree[k, v])
+}
+\end{lstlisting}
+Note that \lstinline{RedBlackTree} is a recursive data type, since it refers to itself. In addition, \lstinline{RedBlackTree} is polymorphic, with keys of type \lstinline{k} and values of type \lstinline{v}. A \lstinline{Leaf} has no key or value. A \lstinline{Node} has a color, left subtree, key, value and right subtree. We use \lstinline{k -> v} as a shorthand for a node with key \lstinline{k} and value \lstinline{v}.
+
+\subsection{Search}
+
+Binary search trees supports search in $O(\log{n})$ time, where $n$ is the size of the tree \citep{cormen-et-al-2009}. The ordering of the keys means we can use binary search and skip about half of the remaining tree at each step. We will implement two search functions. The first is \lstinline{memberOf} which solely checks if a given key exists in the tree. The second is \lstinline{get} which checks if a given key exists in the tree and returns its associated value. In order to avoid duplicate code, we implement the binary search in the \lstinline{get} function only.
+
+The \lstinline{get} function takes a key \lstinline{k} and returns \lstinline{Some(v)} if the tree contains \lstinline{k -> v}. Otherwise it returns \lstinline{None}. We define \lstinline{get} as
+\begin{lstlisting}[language=Flix]
+def get(k: k, tree: RedBlackTree[k, v]): Option[v] = match tree {
+  case Node(_, a, k1, v, b) =>
+    let cmp = k <=> k1;
+    if (cmp < 0)
+      get(k, a)
+    else if (cmp == 0)
+      Some(v)
+    else
+      get(k, b)
+  case _ => None
+}
+\end{lstlisting}
+The \lstinline{<=>} syntax denotes a three-way comparison. We can subsequently define \lstinline{memberOf} as
+\begin{lstlisting}[language=Flix]
+def memberOf(k: k, tree: RedBlackTree[k, v]): Bool = get(k, tree) != None
+\end{lstlisting}
+
+\subsection{Insert and Delete}
+
+The insert and delete functions are adapted from \citet{okasaki-1998, germane-matthew-2014}. We will not discuss the implementation details here. However, the general idea is the same as the imperative version: modifications such as insert and delete may break the invariants of the tree, so these must be restored after each modification.
+
+The \lstinline{insert} function takes a key \lstinline{k} and a value \lstinline{v} and returns a new tree where \lstinline{k -> v} has been added to the given tree.
+\begin{lstlisting}[language=Flix]
+def insert(k: k, v: v, tree: RedBlackTree[k, v]): RedBlackTree[k, v]
+\end{lstlisting}
+The delete function takes a key \lstinline{k} and returns a new tree where \lstinline{k -> v} has been removed from the given tree.
+
+\begin{lstlisting}[language=Flix]
+def delete(k: k, tree: RedBlackTree[k, v]): RedBlackTree[k, v]
+\end{lstlisting}
+
+\subsection{Fold and Reduce}
+
+The \lstinline{fold} function encapsulates a pattern of recursion for processing a data structure. \lstinline{fold} is very generic and many other functions can be expressed in terms of it. After defining \lstinline{fold} we will demonstrate its power by using it to define the \lstinline{reduce} function.
+
+\lstinline{fold} is a higher-order function that takes a function \lstinline{f} and a seed value \lstinline{s}. The function \lstinline{f} itself takes an accumulator, a key and a value and returns an accumulator. \lstinline{fold} recursively applies \lstinline{f} to the accumulator and each key-value pair in the given tree, starting with the seed value \lstinline{s}. \lstinline{fold} returns the accumulated value if the tree is non-empty. Otherwise it returns \lstinline{s}. We define \lstinline{foldLeft} as
+\begin{lstlisting}[language=Flix]
+def foldLeft(f: (b, k, v) -> b & e, s: b, tree: RedBlackTree[k, v]): b & e =
+  match tree {
+    case Node(_, a, k, v, b) => foldLeft(f, f(foldLeft(f, s, a), k, v), b)
+    case _ => s
+  }
+\end{lstlisting}
+Note that the definition contains two recursive calls, one for each subtree. The first call recurses on the left subtree, then we apply \lstinline{f} and lastly we recurse on the right subtree. \lstinline{foldLeft} traverses the tree in ascending sorted order of the keys. The definition is not tail-recursive, but this is not a problem since the number of recursive calls are bounded by the height of the tree (i.e., $O(\log{n})$ where $n$ is the size of the tree). The \lstinline{& e} syntax denotes that the effect of \lstinline{fold} depends on the effect of the function \lstinline{f}. The \lstinline{foldRight} function is symmetric and traverses the tree in descending sorted order of the keys.
+
+\lstinline{reduce} is a higher-order function that takes a function \lstinline{f}. The function \lstinline{f} itself takes two key-value pairs and returns a single key-valur pair. \lstinline{reduce} applies \lstinline{f} to all key-value pairs in the given tree until a single key-value pair is obtained. \lstinline{reduce} returns \lstinline{Some(k, v)} if the tree is non-empty. Otherwise it returns \lstinline{None}. We define \lstinline{reduceLeft} as
+\begin{lstlisting}[language=Flix]
+def reduceLeft(f: (k, v, k, v) -> (k, v) & e, tree: RedBlackTree[k, v]): Option[(k, v)] & e =
+  foldLeft((x: Option[(k, v)], k1: k, v1: v) -> match x {
+      case Some((k2, v2)) => Some(f(k2, v2, k1, v1))
+      case None => Some(k1, v1)
+  }, None, tree)
+\end{lstlisting}
+Note that the seed value given to \lstinline{fold} is \lstinline{None}. We demonstrate the \lstinline{reduce} function with an example. Consider a tree \lstinline{t} containing \lstinline{0 -> 1}, \lstinline{2 -> 3} and \lstinline{4 -> 5}. We can then compute the sum of all keys and values in \lstinline{t} with
+\begin{lstlisting}[language=Flix]
+RedBlackTree.reduceLeft((k1, v1, k2, v2) -> (k1 + k2, v1 + v2), t)
+\end{lstlisting}
+which returns \lstinline{Some((6, 9))}.
+
+\subsection{Find}
+
+The \lstinline{find} function finds (as the name implies) the first key-value pair in the given tree which satisfies a predicate. Given that we would like \lstinline{find} to terminate as soon as a key-value pair satisfying the predicate is found, it cannot readily be expressed efficiently in terms of \lstinline{fold}, as \lstinline{fold} is unable to break termination early.
+
+\lstinline{find} is a higher-order function that takes a function \lstinline{f}. The function \lstinline{f} itself is a predicate that takes a key-value pair and returns a boolean. \lstinline{find} returns \lstinline{Some(k, v)} if the tree is non-empty. Otherwise it returns \lstinline{None}. We define \lstinline{findLeft} as
+\begin{lstlisting}[language=Flix]
+def findLeft(f: (k, v) -> Bool, tree: RedBlackTree[k, v]): Option[(k, v)] =
+  match tree {
+    case Node(_, a, k, v, b) => match findLeft(f, a) {
+        case None => if (f(k, v)) Some((k, v)) else findLeft(f, b)
+        case Some((k1, v1)) => Some((k1, v1))
+    }
+    case _ => None
+  }
+\end{lstlisting}
+We recurse on the left subtree until we reach a leaf, then we check whether \lstinline{f(k, v)} holds, returning \lstinline{Some((k, v))} if it is. Otherwise we recurse on the right subtree. Note that \lstinline{findLeft} traverses the tree in ascending sorted order of the keys and returns the smallest element satisfying \lstinline{f}. The \lstinline{findRight} function is symmetric and traverses the tree in descending sorted order of the keys. The predicate \lstinline{f} is required to be pure.
+
+\subsection{Forall and Exists}
+
+The \lstinline{forall} and \lstinline{exists} functions are akin to the $\forall$ and $\exists$ quantifiers in first-order logic.
+
+\lstinline{forall} is a higher-order function that takes a function \lstinline{f}. The function \lstinline{f} itself is a predicate that takes a key-value pair and returns a boolean. \lstinline{forall} returns \lstinline{true} if and only if all the key-value pairs in the tree satisfies \lstinline{f}. We define \lstinline{forall} as
+\begin{lstlisting}[language=Flix]
+def forall(f: (k, v) -> Bool, tree: RedBlackTree[k, v]): Bool = match tree {
+  case Node(_, a, k, v, b) => f(k, v) && forall(f, a) && forall(f, b)
+  case _ => true
+}
+\end{lstlisting}
+Note the use of short-circuit evaluation with \lstinline{&&} which ensures that \lstinline{forall} terminates as early as possible, in case some key-value pair does not satisfy \lstinline{f}. The predicate \lstinline{f} is required to be pure.
+
+\lstinline{exists} is a higher-order function that takes a function \lstinline{f}. The function \lstinline{f} itself is a predicate that takes a key-value pair and returns a boolean. \lstinline{exists} returns \lstinline{true} if and only if at least one key-value pair in the tree satisfies \lstinline{f}. We define \lstinline{exists} as
+\begin{lstlisting}[language=Flix]
+def exists(f: (k, v) -> Bool, tree: RedBlackTree[k, v]): Bool = match tree {
+  case Node(_, a, k, v, b) => f(k, v) || exists(f, a) || exists(f, b)
+  case _ => false
+}
+\end{lstlisting}
+Note the use of short-circuit evaluation with \lstinline{||} which ensures that \lstinline{exists} terminates as early as possible, in case some key-value pair satisfies \lstinline{f}. The predicate \lstinline{f} is required to be pure.
+
+\subsection{Foreach}
+
+The \lstinline{foreach} function is special: it is the only implemented function which is inherently impure.
+
+\lstinline{foreach} is a higher-order functions that takes a function \lstinline{f}. The function \lstinline{f} itself takes a key-value pair and returns the unit value \lstinline{()} with some side effect. We define \lstinline{foreach} as
+\begin{lstlisting}[language=Flix]
+def foreach(f: (k, v) ~> Unit, tree: RedBlackTree[k, v]): Unit & Impure =
+  match tree {
+    case Node(_, a, k, v, b) => foreach(f, a); f(k, v); foreach(f, b)
+    case _ => ()
+  }
+\end{lstlisting}
+Note the \lstinline{~>} syntax, denoting that \lstinline{f} is required to be impure. We demonstrate the \lstinline{foreach} function with an example. Consider again the tree \lstinline{t} containing \lstinline{0 -> 1}, \lstinline{2 -> 3} and \lstinline{4 -> 5}. We can then print out all values in \lstinline{t} to the console with
+\begin{lstlisting}[language=Flix]
+RedBlackTree.foreach((_, v) -> Console.printLine(Int32.toString(v)), t)
+\end{lstlisting}
+which returns \lstinline{()} and prints out
+\begin{lstlisting}
+1
+3
+5
+\end{lstlisting}
+to the console.
+
+\section{Set} \label{set}
+
+We will now utilize the red-black tree to implement immutable sets. We will define sets as an algebraic data type consisting of a red-black tree, where the keys in the tree corresponds to the elements in the set. We will use the unit value \lstinline{()} as a dummy value for all values in the tree. We define the set type as
+\begin{lstlisting}[language=Flix]
+enum Set[t] {
+  case Set(RedBlackTree[t, Unit])
+}
+\end{lstlisting}
+Note that \lstinline{Set} is polymorphic with elements of type \lstinline{t}, which is also the type of the keys in the underlying red-black tree.
+
+We can define the \lstinline{memberOf}, \lstinline{insert} and \lstinline{delete} functions as facades which calls the corresponding function on the underlying red-black tree.
+\begin{lstlisting}[language=Flix]
+def memberOf(x: a, xs: Set[a]): Bool =
+  let Set(es) = xs;
+  RedBlackTree.memberOf(x, es)
+
+def insert(x: a, xs: Set[a]): Set[a] =
+  let Set(es) = xs;
+  Set(RedBlackTree.insert(x, (), es))
+
+def delete(x: a, xs: Set[a]): Set[a] =
+  let Set(es) = xs;
+  Set(RedBlackTree.delete(x, es))
+\end{lstlisting}
+The \lstinline{let Set(es) = xs} syntax extracts the underlying red-black tree and assigns it to the variable \lstinline{es}.
+
+A total of 37 functions were implemented for sets. However, many of them are defined as the facades above and will not be discussed. Instead, we once again demonstrate the power of \lstinline{fold} by using it to implement the three functions \lstinline{union}, \lstinline{partition} and \lstinline{subsets}. The signature of \lstinline{Set.foldLeft} is 
+\begin{lstlisting}[language=Flix]
+def foldLeft(f: (b, a) -> b & e, s: b, xs: Set[a]): b & e
+\end{lstlisting}
+
+\lstinline{union} takes two sets \lstinline{xs} and \lstinline{ys} and returns a set containing the union of the elements in \lstinline{xs} and \lstinline{ys}. We define \lstinline{union} as
+\begin{lstlisting}[language=Flix]
+def union(xs: Set[a], ys: Set[a]): Set[a] =
+  foldLeft((acc, x) -> insert(x, acc), xs, ys)
+\end{lstlisting}
+
+\lstinline{partition} takes a function \lstinline{f}. The function \lstinline{f} itself is a predicate that takes an element an returns a boolean. \lstinline{partition} returns a pair of sets \lstinline{(ys, zs)} where \lstinline{ys} contains all the elements in the given set that satisfy \lstinline{f} and \lstinline{zs} contains all the elements that does not satisfy \lstinline{f}. We define \lstinline{partition} as
+\begin{lstlisting}[language=Flix]
+def partition(f: a -> Bool, xs: Set[a]): (Set[a], Set[a]) =
+  foldLeft((acc, x) ->
+    let (a, b) = acc;
+    if (f(x))
+      (insert(x, a), b)
+    else
+      (a, insert(x, b)),
+  (empty(), empty()), xs)
+\end{lstlisting}
+
+\lstinline{subsets} returns a set of all the subsets in the given set. We define \lstinline{subsets} as
+\begin{lstlisting}[language=Flix]
+def subsets(xs: Set[a]): Set[Set[a]] =
+  foldLeft((acc, x) ->
+    union(map(y -> insert(x, y), acc), acc),
+  insert(empty(), empty()), xs)
+\end{lstlisting}
+The \lstinline{map} function used above is also defined in terms of \lstinline{fold} and has the signature
+\begin{lstlisting}[language=Flix]
+def map(f: a -> b & e, xs: Set[a]): Set[b] & e
+\end{lstlisting}
+We demonstrate the \lstinline{subsets} function with an example. Consider a set \lstinline{s} containg \lstinline{1}, \lstinline{2} and \lstinline{3}. We can then compute all $2^3$ subsets of \lstinline{s} as
+\begin{lstlisting}[language=Flix]
+Set.subsets(s)
+\end{lstlisting}
+which returns
+\begin{lstlisting}[language=Flix]
+Set(Set(), Set(1), Set(2), Set(1, 2), Set(3), Set(1, 3), Set(2, 3), Set(1, 2, 3))
+\end{lstlisting}
+
+We conclude this section with a dependency graph which shows the relations between the set functions and the red-black tree. A function with \lstinline{*} indicates that it exists in multiple versions (e.g., \lstinline{fold*} covers \lstinline{foldLeft} and \lstinline{foldRight}). Note that not all set functions are shown here for brevity. For a complete list we refer the reader to the Flix Standard Library\footnote{https://flix.dev/api/\#/Set}. Many functions depends on more than one other function, but for clarity we only show the primary dependency here.
+
+\begin{figure}[H]
+\begin{forest}
+  for tree={
+      grow'=0,
+      child anchor=west,
+      edge={->}
+  }
+  [\lstinline{RedBlackTree}
+    [\lstinline{.size}
+      [\lstinline{Set.size}]
+    ]
+    [\lstinline{.empty}
+      [\lstinline{Set.empty}]
+      [\lstinline{Set.isEmpty}]
+    ]
+    [\lstinline{.insert*}
+      [\lstinline{Set.insert}
+        [\lstinline{Set.singleton}]
+        [\lstinline{Set.range}]
+        [\lstinline{Set.replace}]
+      ]
+    ]
+    [\lstinline{.updateWith}]
+    [\lstinline{.delete}
+      [\lstinline{Set.delete}]
+    ]
+    [\lstinline{.get}
+      [\lstinline{.memberOf}
+        [\lstinline{Set.memberOf}]
+      ]
+    ]
+    [\lstinline{.find*}
+      [\lstinline{Set.find*}]
+    ]
+    [\lstinline{.fold*}
+        [\lstinline{.reduce*}
+          [\lstinline{Set.reduce*}]
+        ]
+        [\lstinline{Set.fold*}
+          [\lstinline{Set.count}]
+          [\lstinline{Set.flatten}]
+          [\lstinline{Set.union}]
+          [\lstinline{Set.intersection}]
+          [\lstinline{Set.difference}]
+          [\lstinline{Set.subsets}]
+          [\lstinline{Set.filter}]
+          [\lstinline{Set.map}]
+          [\lstinline{Set.flatMap}]
+          [\lstinline{Set.partition}]
+          [\lstinline{Set.toList}]
+          [\lstinline{Set.toMap}]
+      ]
+    ]
+    [\lstinline{.exists}
+    [\lstinline{Set.exists}]
+    ]
+    [\lstinline{.forall}
+      [\lstinline{Set.forall}
+        [\lstinline{Set.isSubsetOf}]
+        [\lstinline{Map.isProperSubsetOf}]
+      ]
+    ]
+    [\lstinline{.foreach}
+    [\lstinline{Set.foreach}]
+    ]
+  ]
+\end{forest}
+\caption{Dependency graph of \lstinline{RedBlackTree} and \lstinline{Set}}
+\end{figure}
+
+\section{Map} \label{map}
+
+We now define immutable maps in a manner similar as we did with sets. We will define maps as an algebraic data type consisting of a red-black tree, where the keys and values in the tree corresponds to the keys and values in the map. We define the map type as
+\begin{lstlisting}[language=Flix]
+enum Map[k, v] {
+  case Map(RedBlackTree[k, v])
+}
+\end{lstlisting}
+Note that \lstinline{Map} is polymorphic with keys of type \lstinline{k} and values of type \lstinline{v}.
+
+A total of 56 functions were implemented for maps. The \lstinline{memberOf}, \lstinline{insert} and \lstinline{delete} functions are identical to the facades we implemented in \lstinline{Set}, except the \lstinline{Map.insert} function takes and inserts both a key and value. Due to their dull nature, we will not further discuss the facade definitions for maps.
+
+We conclude this section with a dependency graph which shows the relations between the map functions and the red-black tree. A function with \lstinline{*} indicates that it exists in multiple versions. Note that not all map functions are shown here for brevity. For a complete list we refer the reader to the Flix Standard Library\footnote{https://flix.dev/api/\#/Map}. Many functions depends on more than one other function, but for clarity we only show the primary dependency here.
+
+\begin{figure}[H]
+\begin{forest}
+  for tree={
+      grow'=0,
+      child anchor=west,
+      edge={->}
+  }
+  [\lstinline{RedBlackTree}
+    [\lstinline{.size}
+      [\lstinline{Map.size}]
+    ]
+    [\lstinline{.empty}
+      [\lstinline{Map.empty}]
+      [\lstinline{Map.isEmpty}]
+    ]
+    [\lstinline{.insert*}
+      [\lstinline{Map.insert*}
+        [\lstinline{Map.singleton}]
+      ]
+    ]
+    [\lstinline{.updateWith}
+      [\lstinline{Map.update*}
+        [\lstinline{Map.adjust*}]
+      ]
+    ]
+    [\lstinline{.delete}
+      [\lstinline{Map.delete}]
+    ]
+    [\lstinline{.get}
+      [\lstinline{.memberOf}
+        [\lstinline{Map.memberOf}]
+      ]
+      [\lstinline{Map.get*}]
+    ]
+    [\lstinline{find*}
+      [\lstinline{Map.find*}]
+    ]
+    [\lstinline{.fold*}
+      [\lstinline{.reduce*}
+        [\lstinline{Map.reduce*}]
+      ]
+      [\lstinline{Map.fold*}
+        [\lstinline{Map.keysOf}]
+        [\lstinline{Map.valuesOf}]
+        [\lstinline{Map.filter*}]
+        [\lstinline{Map.map*}]
+        [\lstinline{Map.count}]
+        [\lstinline{Map.union*}]
+        [\lstinline{Map.intersection*}]
+        [\lstinline{Map.difference*}]
+        [\lstinline{Map.toList}]
+        [\lstinline{Map.toSet}]
+      ]
+    ]
+    [\lstinline{exists}
+    [\lstinline{Map.exists}]
+    ]
+    [\lstinline{forall}
+      [\lstinline{Map.forall}
+        [\lstinline{Map.isSubmapOf}]
+        [\lstinline{Map.isProperSubmapOf}]
+      ]
+    ]
+    [\lstinline{foreach}
+    [\lstinline{Map.foreach}]
+    ]
+  ]
+\end{forest}
+\caption{Dependency graph of \lstinline{RedBlackTree} and \lstinline{Map}}
+\end{figure}
+
+\end{document}

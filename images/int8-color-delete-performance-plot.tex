@@ -1,0 +1,35 @@
+\begin{tikzpicture}
+    \begin{axis}[
+        xlabel=\textsf{runtime} with \lstinline{Color} (ns),
+        ylabel=\textsf{runtime} with \lstinline{Int8} (ns),
+        legend pos=north west,
+        xmin=0, xmax=12000,
+        xtick={0, 2000, 4000, 6000, 8000, 10000, 12000},
+        ymin=0, ymax=12000,
+        ytick={0, 2000, 4000, 6000, 8000, 10000, 12000},
+        scaled ticks={base 10:-3},
+        ]
+    \draw [gray, dashed] (rel axis cs:0,0) -- (rel axis cs:1,1);
+    \addplot[color=\color{color-3}, mark=+, only marks] coordinates {
+        (1610.0, 1035.0)
+        (1519.0, 1073.0)
+        (2072.0, 1250.0)
+        (2809.0, 1483.0)
+        (2717.0, 1558.0)
+        (3105.0, 1762.0)
+        (3367.0, 1943.0)
+        (3645.0, 2146.0)
+        (4143.0, 2333.0)
+        (4465.0, 2644.0)
+        (5154.0, 3014.0)
+        (5985.0, 3358.0)
+        (5803.0, 4053.0)
+        (7488.0, 3741.0)
+        (7527.0, 4851.0)
+        (7825.0, 5365.0)
+        (9818.0, 5959.0)
+        (10232.0, 6151.0)
+        (11345.0, 7856.0)
+    };
+    \end{axis}
+\end{tikzpicture}

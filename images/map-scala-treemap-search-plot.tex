@@ -1,0 +1,35 @@
+\begin{tikzpicture}
+    \begin{axis}[
+        xlabel=\textsf{runtime} of \lstinline{TreeMap} (ns),
+        ylabel=\textsf{runtime} of \lstinline{Map} (ns),
+        legend pos=north west,
+        xmin=0, xmax=3000,
+        xtick={0, 500, 1000, 1500, 2000, 2500, 3000},
+        ymin=0, ymax=3000,
+        ytick={0, 500, 1000, 1500, 2000, 2500, 3000},
+        scaled ticks={base 10:-3},
+        ]
+    \draw [gray, dashed] (rel axis cs:0,0) -- (rel axis cs:1,1);
+    \addplot[color=\color{color-1}, mark=+, only marks] coordinates {
+        (78.0, 229.0)
+        (88.0, 261.0)
+        (102.0, 291.0)
+        (115.0, 324.0)
+        (126.0, 373.0)
+        (154.0, 395.0)
+        (164.0, 408.0)
+        (200.0, 501.0)
+        (258.0, 557.0)
+        (294.0, 654.0)
+        (365.0, 854.0)
+        (507.0, 996.0)
+        (622.0, 1208.0)
+        (857.0, 1363.0)
+        (955.0, 1595.0)
+        (1141.0, 1770.0)
+        (1281.0, 2447.0)
+        (1644.0, 2566.0)
+        (1847.0, 2795.0)
+    };
+    \end{axis}
+\end{tikzpicture}
